@@ -40,7 +40,11 @@ const client = new MongoClient(uri, {
 // Connect to MongoDb
 async function run() {
   try {
-    const usersCollection = client.db("Newsportal").collection("users");
+    const usersCollection = client.db("DaylightNews").collection("users");
+    const writersCollection = client.db("DaylightNews").collection("writers");
+    const newsCollection = client.db("DaylightNews").collection("news");
+    const commentsCollection = client.db("DaylightNews").collection("comments");
+    const likesCollection = client.db("DaylightNews").collection("likes");
     // Verify Admin
     const verifyAdmin = async (req, res, next) => {
       const decodedEmail = req.decoded.email;
@@ -123,6 +127,160 @@ async function run() {
         expiresIn: "1d",
       });
       res.send({ result, token });
+    });
+
+    // post a writers
+    app.post("/writers", async (req, res) => {
+      const writer = req.body;
+      const result = await writersCollection.insertOne(writer);
+      res.send(result);
+    });
+    // get writers
+    app.get("/writers", verifyJWT, async (req, res) => {
+      const writers = await writersCollection
+        .find({ role: "writer" })
+        .toArray();
+      res.send(writers);
+    });
+    // update writer
+    app.patch("/writers/:email", verifyJWT, async (req, res) => {
+      const email = req.params.email;
+      const decodedEmail = req.decoded.email;
+      if (email !== decodedEmail) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      const shop = req.body;
+      const query = {
+        email: email,
+      };
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: shop,
+      };
+      const result = await writersCollection.updateOne(
+        query,
+        updateDoc,
+        options
+      );
+      res.send(result);
+    });
+    // post a news
+    app.post("/news", verifyJWT, async (req, res) => {
+      const news = req.body;
+      const result = await newsCollection.insertOne(news);
+      res.send(result);
+    });
+    // get all news
+    app.get("/news", verifyJWT, async (req, res) => {
+      const news = await newsCollection.find({}).toArray();
+      res.send(news);
+    });
+    // get a single news
+    app.get("/news/:id", verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const news = await newsCollection.findOne(query);
+      res.send(news);
+    });
+
+    // update a news
+    app.patch("/news/:id", verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const news = req.body;
+      const query = { _id: ObjectId(id) };
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: news,
+      };
+      const result = await newsCollection.updateOne(query, updateDoc, options);
+      res.send(result);
+    });
+
+    // delete a news
+    app.delete("/news/:id", verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const result = await newsCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    // get all news by user email
+    app.get("/news/user/:email", verifyJWT, async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const news = await newsCollection.find(query).toArray();
+      res.send(news);
+    });
+
+    // post a comment
+    app.post("/comments", verifyJWT, async (req, res) => {
+      const comment = req.body;
+      const result = await commentsCollection.insertOne(comment);
+      res.send(result);
+    });
+
+    // get all comments
+    app.get("/comments", verifyJWT, async (req, res) => {
+      const comments = await commentsCollection.find({}).toArray();
+      res.send(comments);
+    });
+
+    // get comments by news id
+    app.get("/comments/:id", verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const query = { newsId: id };
+      const comments = await commentsCollection.find(query).toArray();
+      res.send(comments);
+    });
+
+    // delete a comment
+    app.delete("/comments/:id", verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const result = await commentsCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    // get all comments by user email
+    app.get("/comments/user/:email", verifyJWT, async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const comments = await commentsCollection.find(query).toArray();
+      res.send(comments);
+    });
+
+    // post a like
+    app.post("/likes", verifyJWT, async (req, res) => {
+      const like = req.body;
+      const result = await likesCollection.insertOne(like);
+      res.send(result);
+    });
+
+    // get all likes
+    app.get("/likes", verifyJWT, async (req, res) => {
+      const likes = await likesCollection.find({}).toArray();
+      res.send(likes);
+    });
+    // get likes by news id
+    app.get("/likes/:id", verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const query = { newsId: id };
+      const likes = await likesCollection.find(query).toArray();
+      res.send(likes);
+    });
+    // remove a like
+    app.delete("/likes/:id", verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const result = await likesCollection.deleteOne(query);
+      res.send(result);
+    });
+    // get all likes by user email
+    app.get("/likes/user/:email", verifyJWT, async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const likes = await likesCollection.find(query).toArray();
+      res.send(likes);
     });
   } catch (error) {
     console.log(error);
