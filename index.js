@@ -42,7 +42,7 @@ async function run() {
   try {
     const usersCollection = client.db("DaylightNews").collection("users");
     const writersCollection = client.db("DaylightNews").collection("writers");
-    const newsCollection = client.db("DaylightNews").collection("news");
+    const newsCollection = client.db("DaylightNews").collection("News");
     const commentsCollection = client.db("DaylightNews").collection("comments");
     const likesCollection = client.db("DaylightNews").collection("likes");
     // Verify Admin
@@ -83,7 +83,11 @@ async function run() {
 
     // Get All User
     app.get("/users", async (req, res) => {
-      const users = await usersCollection.find({}).toArray();
+      const users = await usersCollection
+        .find({
+          role: { $ne: "admin" },
+        })
+        .toArray();
       res.send(users);
     });
 
@@ -136,12 +140,11 @@ async function run() {
       res.send(result);
     });
     // get writers
-    app.get("/writers", verifyJWT, async (req, res) => {
-      const writers = await writersCollection
-        .find({ role: "writer" })
-        .toArray();
+    app.get("/writers", async (req, res) => {
+      const writers = await writersCollection.find({}).toArray();
       res.send(writers);
     });
+
     // update writer
     app.patch("/writers/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
@@ -171,10 +174,19 @@ async function run() {
       res.send(result);
     });
     // get all news
-    app.get("/news", verifyJWT, async (req, res) => {
+    app.get("/news", async (req, res) => {
       const news = await newsCollection.find({}).toArray();
       res.send(news);
     });
+    // get news by category
+
+    app.get("/news/:category", async (req, res) => {
+      const category = req.params.category;
+      const query = { category: category };
+      const news = await newsCollection.find(query).toArray();
+      res.send(news);
+    });
+
     // get a single news
     app.get("/news/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
