@@ -36,6 +36,7 @@ const client = new MongoClient(uri, {
   useUnifiedTopology: true,
   serverApi: ServerApiVersion.v1,
 });
+console.log(uri);
 
 // Connect to MongoDb
 async function run() {
@@ -45,6 +46,8 @@ async function run() {
     const newsCollection = client.db("DaylightNews").collection("News");
     const commentsCollection = client.db("DaylightNews").collection("comments");
     const likesCollection = client.db("DaylightNews").collection("likes");
+    const votingNewsCollection = client.db("DaylightNews").collection("votingNews");
+
     // Verify Admin
     const verifyAdmin = async (req, res, next) => {
       const decodedEmail = req.decoded.email;
