@@ -5,7 +5,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 
 const app = express();
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 8000;
 
 app.use(cors());
 app.use(express.json());
@@ -30,7 +30,9 @@ function verifyJWT(req, res, next) {
 }
 
 //MongoDb Add
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.teba24n.mongodb.net/?retryWrites=true&w=majority`;
+// const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.teba24n.mongodb.net/?retryWrites=true&w=majority`;
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.vd49rqv.mongodb.net/?retryWrites=true&w=majority`;
+
 const client = new MongoClient(uri, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
@@ -42,9 +44,11 @@ async function run() {
   try {
     const usersCollection = client.db("DaylightNews").collection("users");
     const writersCollection = client.db("DaylightNews").collection("writers");
-    const newsCollection = client.db("DaylightNews").collection("News");
+    const allNewsCollection = client.db("DaylightNews").collection("allNews");
     const commentsCollection = client.db("DaylightNews").collection("comments");
     const likesCollection = client.db("DaylightNews").collection("likes");
+    const votingNewsCollection = client.db("DaylightNews").collection("votingNews");
+
     // Verify Admin
     const verifyAdmin = async (req, res, next) => {
       const decodedEmail = req.decoded.email;
@@ -177,20 +181,53 @@ async function run() {
     // post a news
     app.post("/news", verifyJWT, async (req, res) => {
       const news = req.body;
-      const result = await newsCollection.insertOne(news);
+      const result = await allNewsCollection.insertOne(news);
       res.send(result);
     });
     // get all news
     app.get("/news", async (req, res) => {
-      const news = await newsCollection.find({}).toArray();
+      const news = await allNewsCollection.find({}).toArray();
       res.send(news);
     });
+
+    // get news for voting 
+    app.get('/newsForVoting', async (req, res) => {
+      const news = await allNewsCollection.find({}).sort({ _id: -1 }).limit(7).toArray()
+
+      res.send(news)
+    })
+    // voting get data 
+    app.get('/votingNews', async (req, res) => {
+      const data = await votingNewsCollection.find({}).toArray()
+      res.send(data)
+    })
+    // vote put here 
+    app.put('/votingNews', async (req, res) => {
+      const { id } = req.query
+      const filter = { _id: ObjectId(id) }
+      const voteData = req.body
+
+      const options = { upsert: true }
+
+      const updateDoc = {
+        $set: {
+          vote: {
+            Yes: voteData.Yes.Yes,
+            No: voteData.No.No,
+            No_Opinion: voteData.No_Opinion.No_Opinion
+          }
+        }
+      }
+      const result = await allNewsCollection.updateOne(filter, updateDoc, options)
+      res.send(result)
+    })
+
     // get news by category
 
     app.get("/news/:category", async (req, res) => {
       const category = req.params.category;
       const query = { category: category };
-      const news = await newsCollection.find(query).toArray();
+      const news = await allNewsCollection.find(query).toArray();
       res.send(news);
     });
 
@@ -198,7 +235,7 @@ async function run() {
     app.get("/news/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const query = { _id: ObjectId(id) };
-      const news = await newsCollection.findOne(query);
+      const news = await allNewsCollection.findOne(query);
       res.send(news);
     });
 
@@ -211,7 +248,7 @@ async function run() {
       const updateDoc = {
         $set: news,
       };
-      const result = await newsCollection.updateOne(query, updateDoc, options);
+      const result = await allNewsCollection.updateOne(query, updateDoc, options);
       res.send(result);
     });
 
@@ -219,7 +256,7 @@ async function run() {
     app.delete("/news/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const query = { _id: ObjectId(id) };
-      const result = await newsCollection.deleteOne(query);
+      const result = await allNewsCollection.deleteOne(query);
       res.send(result);
     });
 
@@ -227,7 +264,7 @@ async function run() {
     app.get("/news/user/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
-      const news = await newsCollection.find(query).toArray();
+      const news = await allNewsCollection.find(query).toArray();
       res.send(news);
     });
 
