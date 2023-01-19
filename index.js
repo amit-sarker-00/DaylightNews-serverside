@@ -5,7 +5,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 
 const app = express();
-const port = process.env.PORT || 8000;
+const port = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
@@ -44,10 +44,12 @@ async function run() {
   try {
     const usersCollection = client.db("DaylightNews").collection("users");
     const writersCollection = client.db("DaylightNews").collection("writers");
-    const allNewsCollection = client.db("DaylightNews").collection("allNews");
+    const allNewsCollection = client.db("DaylightNews").collection("news");
     const commentsCollection = client.db("DaylightNews").collection("comments");
     const likesCollection = client.db("DaylightNews").collection("likes");
-    const votingNewsCollection = client.db("DaylightNews").collection("votingNews");
+    const votingNewsCollection = client
+      .db("DaylightNews")
+      .collection("votingNews");
 
     // Verify Admin
     const verifyAdmin = async (req, res, next) => {
@@ -190,37 +192,45 @@ async function run() {
       res.send(news);
     });
 
-    // get news for voting 
-    app.get('/newsForVoting', async (req, res) => {
-      const news = await allNewsCollection.find({}).sort({ _id: -1 }).limit(7).toArray()
+    // get news for voting
+    app.get("/newsForVoting", async (req, res) => {
+      const news = await allNewsCollection
+        .find({})
+        .sort({ _id: -1 })
+        .limit(7)
+        .toArray();
 
-      res.send(news)
-    })
-    // voting get data 
-    app.get('/votingNews', async (req, res) => {
-      const data = await votingNewsCollection.find({}).toArray()
-      res.send(data)
-    })
-    // vote put here 
-    app.put('/votingNews', async (req, res) => {
-      const { id } = req.query
-      const filter = { _id: ObjectId(id) }
-      const voteData = req.body
+      res.send(news);
+    });
+    // voting get data
+    app.get("/votingNews", async (req, res) => {
+      const data = await votingNewsCollection.find({}).toArray();
+      res.send(data);
+    });
+    // vote put here
+    app.put("/votingNews", async (req, res) => {
+      const { id } = req.query;
+      const filter = { _id: ObjectId(id) };
+      const voteData = req.body;
 
-      const options = { upsert: true }
+      const options = { upsert: true };
 
       const updateDoc = {
         $set: {
           vote: {
             Yes: voteData.Yes.Yes,
             No: voteData.No.No,
-            No_Opinion: voteData.No_Opinion.No_Opinion
-          }
-        }
-      }
-      const result = await allNewsCollection.updateOne(filter, updateDoc, options)
-      res.send(result)
-    })
+            No_Opinion: voteData.No_Opinion.No_Opinion,
+          },
+        },
+      };
+      const result = await allNewsCollection.updateOne(
+        filter,
+        updateDoc,
+        options
+      );
+      res.send(result);
+    });
 
     // get news by category
 
@@ -248,7 +258,11 @@ async function run() {
       const updateDoc = {
         $set: news,
       };
-      const result = await allNewsCollection.updateOne(query, updateDoc, options);
+      const result = await allNewsCollection.updateOne(
+        query,
+        updateDoc,
+        options
+      );
       res.send(result);
     });
 
