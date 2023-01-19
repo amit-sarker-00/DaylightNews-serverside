@@ -167,6 +167,13 @@ async function run() {
       );
       res.send(result);
     });
+    //deleter a writer by id
+    app.delete("/writers/:id", verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const result = await writersCollection.deleteOne(query);
+      res.send(result);
+    });
     // post a news
     app.post("/news", verifyJWT, async (req, res) => {
       const news = req.body;
