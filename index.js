@@ -233,14 +233,26 @@ async function run() {
     });
 
     // get news by category
-
     app.get("/news/:category", async (req, res) => {
       const category = req.params.category;
       const query = { category: category };
       const news = await allNewsCollection.find(query).toArray();
       res.send(news);
     });
-
+    // get news by writer email
+    app.get("/news/:email", verifyJWT, async (req, res) => {
+      const email = req.params.email;
+      console.log(email);
+      const decodedEmail = req.decoded.email;
+      if (email !== decodedEmail) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      const query = {
+        email,
+      };
+      const news = await allNewsCollection.find(query).toArray();
+      res.send(news);
+    });
     // get a single news
     app.get("/news/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
@@ -274,14 +286,6 @@ async function run() {
       res.send(result);
     });
 
-    // get all news by user email
-    app.get("/news/user/:email", verifyJWT, async (req, res) => {
-      const email = req.params.email;
-      const query = { email: email };
-      const news = await allNewsCollection.find(query).toArray();
-      res.send(news);
-    });
-
     // post a comment
     app.post("/comments", verifyJWT, async (req, res) => {
       const comment = req.body;
@@ -312,7 +316,7 @@ async function run() {
     });
 
     // get all comments by user email
-    app.get("/comments/user/:email", verifyJWT, async (req, res) => {
+    app.get("/comments/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
       const comments = await commentsCollection.find(query).toArray();
