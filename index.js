@@ -47,7 +47,9 @@ async function run() {
     const allNewsCollection = client.db("DaylightNews").collection("allNews");
     const commentsCollection = client.db("DaylightNews").collection("comments");
     const likesCollection = client.db("DaylightNews").collection("likes");
-    const votingNewsCollection = client.db("DaylightNews").collection("votingNews");
+    const votingNewsCollection = client
+      .db("DaylightNews")
+      .collection("votingNews");
 
     // Verify Admin
     const verifyAdmin = async (req, res, next) => {
@@ -171,6 +173,13 @@ async function run() {
       );
       res.send(result);
     });
+    //deleter a writer by id
+    app.delete("/writers/:id", verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const result = await writersCollection.deleteOne(query);
+      res.send(result);
+    });
     // post a news
     app.post("/news", verifyJWT, async (req, res) => {
       const news = req.body;
@@ -182,55 +191,92 @@ async function run() {
       const news = await allNewsCollection.find({}).toArray();
       res.send(news);
     });
+    // get a single news
+    app.get("/news/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const news = await allNewsCollection.findOne(query);
 
-    // get news for voting 
-    app.get('/newsForVoting', async (req, res) => {
-      const news = await allNewsCollection.find({}).sort({ _id: -1 }).limit(7).toArray()
+      res.send(news);
+    });
+    // get news for voting
+    app.get("/newsForVoting", async (req, res) => {
+      const news = await allNewsCollection
+        .find({})
+        .sort({ _id: -1 })
+        .limit(7)
+        .toArray();
 
-      res.send(news)
-    })
-    // voting get data 
-    app.get('/votingNews', async (req, res) => {
-      const data = await votingNewsCollection.find({}).toArray()
-      res.send(data)
-    })
-    // vote put here 
-    app.put('/votingNews', async (req, res) => {
-      const { id } = req.query
-      const filter = { _id: ObjectId(id) }
-      const voteData = req.body
+      res.send(news);
+    });
+    // get search news
+    app.get("/searchNews", async (req, res) => {
+      let query = {};
+      const search = req.query.search;
 
-      const options = { upsert: true }
+      if (search.length) {
+        query = {
+          $text: {
+            $search: search,
+          },
+        };
+      }
+      const result = await allNewsCollection.find(query).toArray()
+      res.send(result)
+    });
+
+    // voting get data
+    app.get("/votingNews", async (req, res) => {
+      const data = await votingNewsCollection.find({}).toArray();
+      res.send(data);
+    });
+    // vote put here
+    app.put("/votingNews", async (req, res) => {
+      const { id } = req.query;
+      const filter = { _id: ObjectId(id) };
+      const voteData = req.body;
+
+      const options = { upsert: true };
 
       const updateDoc = {
         $set: {
           vote: {
             Yes: voteData.Yes.Yes,
             No: voteData.No.No,
-            No_Opinion: voteData.No_Opinion.No_Opinion
-          }
-        }
-      }
-      const result = await allNewsCollection.updateOne(filter, updateDoc, options)
-      res.send(result)
-    })
+            No_Opinion: voteData.No_Opinion.No_Opinion,
+          },
+        },
+      };
+      const result = await allNewsCollection.updateOne(
+        filter,
+        updateDoc,
+        options
+      );
+      res.send(result);
+    });
 
     // get news by category
-
     app.get("/news/:category", async (req, res) => {
       const category = req.params.category;
       const query = { category: category };
       const news = await allNewsCollection.find(query).toArray();
       res.send(news);
     });
-
-    // get a single news
-    app.get("/news/:id", verifyJWT, async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: ObjectId(id) };
-      const news = await allNewsCollection.findOne(query);
+    // get news by writer email
+    app.get("/news/:email", verifyJWT, async (req, res) => {
+      const email = req.params.email;
+      console.log(email);
+      const decodedEmail = req.decoded.email;
+      if (email !== decodedEmail) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      const query = {
+        email,
+      };
+      const news = await allNewsCollection.find(query).toArray();
       res.send(news);
     });
+
 
     // update a news
     app.patch("/news/:id", verifyJWT, async (req, res) => {
@@ -241,7 +287,11 @@ async function run() {
       const updateDoc = {
         $set: news,
       };
-      const result = await allNewsCollection.updateOne(query, updateDoc, options);
+      const result = await allNewsCollection.updateOne(
+        query,
+        updateDoc,
+        options
+      );
       res.send(result);
     });
 
@@ -251,14 +301,6 @@ async function run() {
       const query = { _id: ObjectId(id) };
       const result = await allNewsCollection.deleteOne(query);
       res.send(result);
-    });
-
-    // get all news by user email
-    app.get("/news/user/:email", verifyJWT, async (req, res) => {
-      const email = req.params.email;
-      const query = { email: email };
-      const news = await allNewsCollection.find(query).toArray();
-      res.send(news);
     });
 
     // post a comment
@@ -291,7 +333,7 @@ async function run() {
     });
 
     // get all comments by user email
-    app.get("/comments/user/:email", verifyJWT, async (req, res) => {
+    app.get("/comments/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
       const comments = await commentsCollection.find(query).toArray();
