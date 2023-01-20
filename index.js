@@ -46,7 +46,7 @@ async function run() {
     const writersCollection = client.db("DaylightNews").collection("writers");
     const allNewsCollection = client.db("DaylightNews").collection("allNews");
     const commentsCollection = client.db("DaylightNews").collection("comments");
-    const likesCollection = client.db("DaylightNews").collection("likes");
+    const reactionsCollection = client.db("DaylightNews").collection("reactions");
     const votingNewsCollection = client
       .db("DaylightNews")
       .collection("votingNews");
@@ -304,28 +304,29 @@ async function run() {
     });
 
     // post a comment
-    app.post("/comments", verifyJWT, async (req, res) => {
+    app.post("/comments", async (req, res) => {
       const comment = req.body;
-      const result = await commentsCollection.insertOne(comment);
+      const result = await commentsCollection.insertOne({ comment });
       res.send(result);
     });
 
     // get all comments
-    app.get("/comments", verifyJWT, async (req, res) => {
+    app.get("/comments", async (req, res) => {
       const comments = await commentsCollection.find({}).toArray();
       res.send(comments);
     });
 
     // get comments by news id
-    app.get("/comments/:id", verifyJWT, async (req, res) => {
+    app.get("/comment/:id", async (req, res) => {
       const id = req.params.id;
-      const query = { newsId: id };
-      const comments = await commentsCollection.find(query).toArray();
+      const query = { "comment._id": id };
+      const cursor = commentsCollection.find(query);
+      const comments = await cursor.toArray();
       res.send(comments);
     });
 
     // delete a comment
-    app.delete("/comments/:id", verifyJWT, async (req, res) => {
+    app.delete("/comment/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const query = { _id: ObjectId(id) };
       const result = await commentsCollection.deleteOne(query);
@@ -333,45 +334,63 @@ async function run() {
     });
 
     // get all comments by user email
-    app.get("/comments/:email", verifyJWT, async (req, res) => {
+    app.get("/comments/:email", async (req, res) => {
       const email = req.params.email;
-      const query = { email: email };
+      const query = { "comment.email": email };
       const comments = await commentsCollection.find(query).toArray();
       res.send(comments);
     });
 
     // post a like
-    app.post("/likes", verifyJWT, async (req, res) => {
-      const like = req.body;
-      const result = await likesCollection.insertOne(like);
+    app.put("/reactions", async (req, res) => {
+      const { id } = req.query
+      const query = { reactionNewsId: id }
+      const reaction = req.body;
+      const options = { upsert: true }
+      const updateDoc = {
+        $set: {
+          reactionNewsId: reaction?.reactionNewsId,
+          smileEmoji: reaction?.smileEmoji.smileEmoji,
+          frownEmoji: reaction?.frownEmoji.frownEmoji,
+          angryEmoji: reaction?.angryEmoji.angryEmoji,
+          sunglasEmoji: reaction?.sunglasEmoji.sunglasEmoji,
+          naturalEmoji: reaction?.naturalEmoji.naturalEmoji,
+        }
+      }
+       
+      const result = await reactionsCollection.updateOne(query, updateDoc, options);
       res.send(result);
     });
 
-    // get all likes
-    app.get("/likes", verifyJWT, async (req, res) => {
-      const likes = await likesCollection.find({}).toArray();
-      res.send(likes);
-    });
-    // get likes by news id
-    app.get("/likes/:id", verifyJWT, async (req, res) => {
+    // get reactions by news id
+    app.get("/reactions/:id", async (req, res) => {
       const id = req.params.id;
-      const query = { newsId: id };
-      const likes = await likesCollection.find(query).toArray();
-      res.send(likes);
+      const query = { reactionNewsId: id };
+      const reactions = await reactionsCollection.findOne(query)
+      res.send(reactions);
     });
+
+
+    // get all reactions
+    app.get("/reactions", verifyJWT, async (req, res) => {
+      const reactions = await reactionsCollection.find({}).toArray();
+      res.send(reactions);
+    });
+
+
     // remove a like
-    app.delete("/likes/:id", verifyJWT, async (req, res) => {
+    app.delete("/reactions/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const query = { _id: ObjectId(id) };
-      const result = await likesCollection.deleteOne(query);
+      const result = await reactionsCollection.deleteOne(query);
       res.send(result);
     });
-    // get all likes by user email
-    app.get("/likes/user/:email", verifyJWT, async (req, res) => {
+    // get all reactions by user email
+    app.get("/reactions/user/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
-      const likes = await likesCollection.find(query).toArray();
-      res.send(likes);
+      const reactions = await reactionsCollection.find(query).toArray();
+      res.send(reactions);
     });
   } catch (error) {
     console.log(error);
