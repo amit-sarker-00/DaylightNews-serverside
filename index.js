@@ -1,11 +1,18 @@
 const express = require("express");
 const cors = require("cors");
+const SSLCommerzPayment = require("sslcommerz-lts");
 const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 
+
 const app = express();
 const port = process.env.PORT || 8000;
+
+const store_id = process.env.STORE_ID;
+const store_passwd = process.env.STORE_PASSWD;
+const is_live = false;
+
 
 app.use(cors());
 app.use(express.json());
@@ -35,13 +42,14 @@ function verifyJWT (req, res, next)
 
 //MongoDb Add
 // const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.teba24n.mongodb.net/?retryWrites=true&w=majority`;
+
 const uri = `mongodb+srv://${ process.env.DB_USER }:${ process.env.DB_PASSWORD }@cluster0.vd49rqv.mongodb.net/?retryWrites=true&w=majority`;
 
 const client = new MongoClient(uri, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
   serverApi: ServerApiVersion.v1,
-});
+})
 
 // Connect to MongoDb
 async function run ()
@@ -54,6 +62,7 @@ async function run ()
     const commentsCollection = client.db("DaylightNews").collection("comments");
     const reactionsCollection = client.db("DaylightNews").collection("reactions");
     const storiesCollection = client.db("DaylightNews").collection("stories");
+    const paymentCollection = client.db("DaylightNews").collection("payment");
 
     const votingNewsCollection = client
       .db("DaylightNews")
@@ -212,10 +221,20 @@ async function run ()
     // get categories
     app.get('/categories', async (req, res) =>
     {
-      const categories = await allNewsCollection.find({}).toArray()
+      const query = {}
+      const categories = await allNewsCollection.find(query).toArray()
       const allCategories = categories?.map(cate => cate.category)
       const category = [ ...new Set(allCategories) ]
       res.send(category)
+    })
+
+    app.get('/categoryNews', async (req, res) =>
+    {
+      const category = req.query.category
+      const query = { category: category }
+      const categoryNews = await allNewsCollection.find(query).toArray()
+      res.send(categoryNews)
+
     })
 
     // get all news
@@ -313,6 +332,14 @@ async function run ()
       const query = { category: 'voices' }
       const voicesNews = await allNewsCollection.find(query).sort({ _id: -1 }).toArray()
       res.send(voicesNews)
+
+    })
+
+    app.get('/sportsNews', async (req, res) =>
+    {
+      const query = { category: 'sports' }
+      const sportsNews = await allNewsCollection.find(query).sort({ _id: -1 }).toArray()
+      res.send(sportsNews)
 
     })
 
@@ -573,6 +600,114 @@ async function run ()
       const reactions = await reactionsCollection.find(query).toArray();
       res.send(reactions);
     });
+
+
+
+// payments 
+    
+    app.post("/payment", async (req, res) =>
+    {
+      const payment = req.body;
+      console.log(payment);
+
+
+      const transactionId = new ObjectId().toString();
+      const data = {
+        total_amount: payment?.amount,
+        currency: payment?.currency,
+        tran_id: transactionId, // use unique tran_id for each api call
+        success_url: `${ process.env.SERVER_URL }/payment/success?transactionId=${ transactionId }`,
+        fail_url: `${ process.env.SERVER_URL }/payment/fail?transactionId=${ transactionId }`,
+        cancel_url: `${ process.env.SERVER_URL }/payment/cancel`,
+        ipn_url: `${ process.env.SERVER_URL }/ipn`,
+        shipping_method: "Courier",
+        product_name: "Computer.",
+        product_category: "Electronic",
+        product_profile: "general",
+        cus_name: payment.paymentPerson,
+        cus_email: payment?.email,
+        cus_add1: payment?.address,
+        cus_add2: "Dhaka",
+        cus_city: "Dhaka",
+        cus_state: "Dhaka",
+        cus_postcode: "1000",
+        cus_country: "Bangladesh",
+        cus_phone: "01711111111",
+        cus_fax: "01711111111",
+        ship_name: "Customer Name",
+        ship_add1: "Dhaka",
+        ship_add2: "Dhaka",
+        ship_city: "Dhaka",
+        ship_state: "Dhaka",
+        ship_postcode: payment?.zipCode,
+        ship_country: "Bangladesh",
+      };
+
+      // console.log(data);
+
+      const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
+      sslcz.init(data).then((apiResponse) =>
+      {
+        // Redirect the user to payment gateway
+        let GatewayPageURL = apiResponse.GatewayPageURL;
+        paymentCollection.insertOne({
+          ...payment,
+          price: payment?.amount,
+          transactionId,
+          paid: false,
+        });
+        console.log(uri)
+        res.send({ url: GatewayPageURL });
+      });
+    });
+
+    app.post("/payment/success", async (req, res) =>
+    {
+      const { transactionId } = req.query;
+      console.log(transactionId);
+      if (!transactionId)
+      {
+        return res.redirect(`${ process.env.CLIENT_URL }/payment/fail`);
+      }
+      const result = await paymentCollection.updateOne(
+        { transactionId },
+        { $set: { paid: true, paidAt: new Date() } }
+      );
+      if (result.modifiedCount > 0)
+      {
+        res.redirect(
+          `${ process.env.CLIENT_URL }/bdPayment/success?transectionId=${ transactionId }`
+        );
+      }
+    });
+
+    app.get("/payment/byTransactionId/:id", async (req, res) =>
+    {
+      const { id } = req.params;
+      console.log(id);
+      const result = await paymentCollection.findOne({
+        transactionId: id,
+      });
+      console.log(result);
+      res.send(result);
+    });
+
+    app.post("/payment/fail", async (req, res) =>
+    {
+      const { transactionId } = req.query;
+      if (!transactionId)
+      {
+        return res.redirect(`${ process.env.CLIENT_URL }/payment/fail`);
+      }
+      const result = await paymentCollection.deleteOne({ transactionId });
+      if (result.deletedCount)
+      {
+        res.redirect(`${ process.env.CLIENT_URL }/payment/fail`);
+      }
+    });
+
+
+
   } catch (error)
   {
     console.log(error);
